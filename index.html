@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Claude — 생각하는 AI 파트너</title>
+  <style>
+    :root {
+      --ground: #12151E;
+      --surface: #1C2030;
+      --surface-2: #252A3A;
+      --text: #F2EDE3;
+      --text-muted: #9A9488;
+      --accent: #E06840;
+      --accent-2: #8B7EC8;
+      --accent-glow: rgba(224, 104, 64, 0.15);
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--ground);
+      color: var(--text);
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      font-size: 16px;
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* ─── NAV ─── */
+    nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 48px;
+      background: rgba(18, 21, 30, 0.85);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid rgba(242, 237, 227, 0.06);
+    }
+
+    .nav-logo {
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 1.35rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--text);
+      text-decoration: none;
+    }
+
+    .nav-logo span { color: var(--accent); }
+
+    .nav-links {
+      display: flex;
+      gap: 36px;
+      list-style: none;
+    }
+
+    .nav-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.875rem;
+      letter-spacing: 0.04em;
+      transition: color 0.2s;
+    }
+
+    .nav-links a:hover { color: var(--text); }
+
+    /* ─── HERO ─── */
+    .hero {
+      position: relative;
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      align-items: center;
+      padding: 120px 48px 80px;
+      gap: 48px;
+      overflow: hidden;
+    }
+
+    .hero-text { position: relative; z-index: 2; }
+
+    .hero-eyebrow {
+      display: inline-block;
+      font-size: 0.75rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--accent);
+      border: 1px solid rgba(224, 104, 64, 0.35);
+      padding: 5px 14px;
+      border-radius: 2px;
+      margin-bottom: 32px;
+    }
+
+    .hero-headline {
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(3rem, 6vw, 5.5rem);
+      line-height: 1.05;
+      letter-spacing: -0.03em;
+      font-weight: 700;
+      margin-bottom: 28px;
+    }
+
+    .hero-headline .line-accent { color: var(--accent); }
+    .hero-headline .line-violet { color: var(--accent-2); }
+
+    .hero-sub {
+      font-size: 1.125rem;
+      color: var(--text-muted);
+      max-width: 480px;
+      line-height: 1.7;
+      margin-bottom: 48px;
+    }
+
+    .hero-actions {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      padding: 14px 32px;
+      font-size: 0.9375rem;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+      border-radius: 4px;
+      cursor: pointer;
+      text-decoration: none;
+      transition: opacity 0.2s, transform 0.15s;
+      display: inline-block;
+    }
+
+    .btn-primary:hover { opacity: 0.88; transform: translateY(-1px); }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--text);
+      border: 1px solid rgba(242, 237, 227, 0.2);
+      padding: 14px 32px;
+      font-size: 0.9375rem;
+      font-weight: 500;
+      border-radius: 4px;
+      cursor: pointer;
+      text-decoration: none;
+      transition: border-color 0.2s, background 0.2s;
+      display: inline-block;
+    }
+
+    .btn-ghost:hover {
+      border-color: rgba(242, 237, 227, 0.5);
+      background: rgba(242, 237, 227, 0.04);
+    }
+
+    /* ─── CANVAS SIDE ─── */
+    .hero-canvas-wrap {
+      position: relative;
+      height: 520px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #wordCanvas {
+      width: 100%;
+      height: 100%;
+      border-radius: 8px;
+    }
+
+    /* ─── TYPING DEMO ─── */
+    .typing-demo {
+      margin-top: 48px;
+      background: var(--surface);
+      border: 1px solid rgba(242, 237, 227, 0.08);
+      border-radius: 8px;
+      padding: 20px 24px;
+      max-width: 520px;
+      font-size: 0.875rem;
+    }
+
+    .typing-prompt {
+      color: var(--text-muted);
+      margin-bottom: 12px;
+      font-size: 0.8125rem;
+    }
+
+    .typing-prompt span {
+      display: inline-block;
+      background: rgba(139, 126, 200, 0.15);
+      color: var(--accent-2);
+      padding: 2px 8px;
+      border-radius: 3px;
+      font-size: 0.75rem;
+      margin-right: 8px;
+      letter-spacing: 0.03em;
+    }
+
+    .typing-text {
+      color: var(--text);
+      line-height: 1.65;
+      min-height: 3em;
+    }
+
+    .cursor {
+      display: inline-block;
+      width: 2px;
+      height: 1em;
+      background: var(--accent);
+      margin-left: 2px;
+      vertical-align: text-bottom;
+      animation: blink 0.9s step-end infinite;
+    }
+
+    @keyframes blink { 50% { opacity: 0; } }
+
+    /* ─── STATS ─── */
+    .stats-bar {
+      background: var(--surface);
+      border-top: 1px solid rgba(242, 237, 227, 0.06);
+      border-bottom: 1px solid rgba(242, 237, 227, 0.06);
+      padding: 48px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0;
+    }
+
+    .stat-item {
+      text-align: center;
+      padding: 16px 32px;
+      border-right: 1px solid rgba(242, 237, 227, 0.08);
+    }
+
+    .stat-item:last-child { border-right: none; }
+
+    .stat-number {
+      font-family: Georgia, serif;
+      font-size: 3rem;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      color: var(--text);
+      display: block;
+    }
+
+    .stat-number em {
+      font-style: normal;
+      color: var(--accent);
+    }
+
+    .stat-label {
+      font-size: 0.8125rem;
+      color: var(--text-muted);
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      margin-top: 8px;
+      display: block;
+    }
+
+    /* ─── CAPABILITIES ─── */
+    .section {
+      padding: 96px 48px;
+    }
+
+    .section-eyebrow {
+      font-size: 0.75rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--accent-2);
+      margin-bottom: 16px;
+    }
+
+    .section-title {
+      font-family: Georgia, serif;
+      font-size: clamp(2rem, 4vw, 3rem);
+      font-weight: 700;
+      letter-spacing: -0.025em;
+      line-height: 1.15;
+      margin-bottom: 64px;
+      max-width: 640px;
+    }
+
+    .capabilities-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 2px;
+    }
+
+    .cap-card {
+      background: var(--surface);
+      padding: 40px 36px;
+      transition: background 0.2s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .cap-card::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 0;
+      width: 3px;
+      height: 0;
+      background: var(--accent);
+      transition: height 0.3s ease;
+    }
+
+    .cap-card:hover { background: var(--surface-2); }
+    .cap-card:hover::before { height: 100%; }
+
+    .cap-card.violet::before { background: var(--accent-2); }
+
+    .cap-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 6px;
+      background: var(--accent-glow);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 24px;
+      font-size: 1.4rem;
+    }
+
+    .cap-card.violet .cap-icon { background: rgba(139, 126, 200, 0.12); }
+
+    .cap-title {
+      font-family: Georgia, serif;
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: -0.015em;
+      margin-bottom: 12px;
+      color: var(--text);
+    }
+
+    .cap-desc {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      line-height: 1.7;
+    }
+
+    /* ─── CONVERSATION ─── */
+    .conversation-section {
+      padding: 96px 48px;
+      background: var(--surface);
+    }
+
+    .conversation-wrap {
+      max-width: 720px;
+      margin: 0 auto;
+    }
+
+    .conv-message {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 28px;
+      opacity: 0;
+      transform: translateY(16px);
+      transition: opacity 0.5s ease, transform 0.5s ease;
+    }
+
+    .conv-message.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .conv-avatar {
+      flex-shrink: 0;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.875rem;
+      font-weight: 700;
+      letter-spacing: 0;
+    }
+
+    .avatar-user {
+      background: rgba(224, 104, 64, 0.18);
+      color: var(--accent);
+    }
+
+    .avatar-claude {
+      background: rgba(139, 126, 200, 0.18);
+      color: var(--accent-2);
+    }
+
+    .conv-bubble {
+      background: var(--surface-2);
+      padding: 16px 20px;
+      border-radius: 8px;
+      font-size: 0.9375rem;
+      line-height: 1.65;
+      color: var(--text);
+      flex: 1;
+    }
+
+    .conv-bubble.user-bubble {
+      background: rgba(224, 104, 64, 0.08);
+      border: 1px solid rgba(224, 104, 64, 0.15);
+    }
+
+    .conv-sender {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      letter-spacing: 0.04em;
+    }
+
+    .conv-sender.claude { color: var(--accent-2); }
+    .conv-sender.user-s { color: var(--accent); }
+
+    /* ─── PHILOSOPHY ─── */
+    .philosophy-section {
+      padding: 96px 48px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 80px;
+      align-items: center;
+    }
+
+    .philosophy-quote {
+      font-family: Georgia, serif;
+      font-size: clamp(1.5rem, 3vw, 2.25rem);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1.3;
+      color: var(--text);
+    }
+
+    .philosophy-quote mark {
+      background: none;
+      color: var(--accent);
+    }
+
+    .philosophy-body {
+      color: var(--text-muted);
+      font-size: 0.9375rem;
+      line-height: 1.75;
+    }
+
+    .philosophy-body p + p { margin-top: 16px; }
+
+    .principle-list {
+      margin-top: 32px;
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .principle-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+    }
+
+    .principle-list li::before {
+      content: "";
+      flex-shrink: 0;
+      margin-top: 8px;
+      width: 20px;
+      height: 1px;
+      background: var(--accent);
+    }
+
+    /* ─── CTA ─── */
+    .cta-section {
+      padding: 96px 48px;
+      text-align: center;
+      background: var(--surface);
+      border-top: 1px solid rgba(242, 237, 227, 0.06);
+    }
+
+    .cta-title {
+      font-family: Georgia, serif;
+      font-size: clamp(2rem, 4vw, 3.5rem);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      margin-bottom: 20px;
+    }
+
+    .cta-sub {
+      color: var(--text-muted);
+      font-size: 1.0625rem;
+      margin-bottom: 40px;
+      max-width: 480px;
+      margin-inline: auto;
+    }
+
+    /* ─── FOOTER ─── */
+    footer {
+      padding: 40px 48px;
+      border-top: 1px solid rgba(242, 237, 227, 0.06);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .footer-logo {
+      font-family: Georgia, serif;
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--text-muted);
+    }
+
+    .footer-logo span { color: var(--accent); }
+
+    .footer-note {
+      font-size: 0.8125rem;
+      color: var(--text-muted);
+      opacity: 0.5;
+    }
+
+    /* ─── RESPONSIVE ─── */
+    @media (max-width: 900px) {
+      nav { padding: 16px 24px; }
+      .hero { grid-template-columns: 1fr; padding: 100px 24px 60px; }
+      .hero-canvas-wrap { display: none; }
+      .hero-headline { font-size: clamp(2.5rem, 10vw, 4rem); }
+      .stats-bar { grid-template-columns: 1fr; gap: 0; }
+      .stat-item { border-right: none; border-bottom: 1px solid rgba(242,237,227,0.08); }
+      .stat-item:last-child { border-bottom: none; }
+      .section { padding: 64px 24px; }
+      .capabilities-grid { grid-template-columns: 1fr; }
+      .conversation-section { padding: 64px 24px; }
+      .philosophy-section { grid-template-columns: 1fr; gap: 40px; padding: 64px 24px; }
+      .cta-section { padding: 64px 24px; }
+      footer { padding: 32px 24px; flex-direction: column; gap: 12px; text-align: center; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- NAV -->
+  <nav>
+    <a href="#" class="nav-logo">Cl<span>au</span>de</a>
+    <ul class="nav-links">
+      <li><a href="#capabilities">기능</a></li>
+      <li><a href="#conversation">대화</a></li>
+      <li><a href="#philosophy">철학</a></li>
+      <li><a href="https://claude.ai" target="_blank" rel="noopener">시작하기</a></li>
+    </ul>
+  </nav>
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="hero-text">
+      <span class="hero-eyebrow">Anthropic · 2024</span>
+      <h1 class="hero-headline">
+        생각을 함께<br />
+        <span class="line-accent">나누는</span><br />
+        <span class="line-violet">AI 파트너</span>
+      </h1>
+      <p class="hero-sub">
+        Claude는 단순히 질문에 답하지 않습니다.<br />
+        당신의 문제를 이해하고, 함께 고민하고,<br />
+        더 나은 결론으로 이끕니다.
+      </p>
+      <div class="hero-actions">
+        <a href="https://claude.ai" target="_blank" rel="noopener" class="btn-primary">Claude와 대화하기</a>
+        <a href="#capabilities" class="btn-ghost">기능 살펴보기</a>
+      </div>
+
+      <div class="typing-demo" aria-label="Claude 대화 예시">
+        <div class="typing-prompt"><span>YOU</span> 이 코드의 버그를 찾아줄 수 있어?</div>
+        <div class="typing-text" id="typingText"><span class="cursor"></span></div>
+      </div>
+    </div>
+
+    <div class="hero-canvas-wrap" aria-hidden="true">
+      <canvas id="wordCanvas"></canvas>
+    </div>
+  </section>
+
+  <!-- STATS -->
+  <div class="stats-bar">
+    <div class="stat-item">
+      <span class="stat-number">200<em>K</em></span>
+      <span class="stat-label">컨텍스트 토큰</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-number">100<em>+</em></span>
+      <span class="stat-label">지원 언어</span>
+    </div>
+    <div class="stat-item">
+      <span class="stat-number">3<em>개</em></span>
+      <span class="stat-label">모델 티어 (Haiku · Sonnet · Opus)</span>
+    </div>
+  </div>
+
+  <!-- CAPABILITIES -->
+  <section class="section" id="capabilities">
+    <div class="section-eyebrow">핵심 기능</div>
+    <h2 class="section-title">Claude가 할 수 있는 일들</h2>
+
+    <div class="capabilities-grid">
+      <div class="cap-card">
+        <div class="cap-icon">✍️</div>
+        <h3 class="cap-title">글쓰기 & 편집</h3>
+        <p class="cap-desc">리포트, 이메일, 블로그 포스트, 소설까지. 맥락을 이해하고 당신의 목소리를 살려 글을 다듬습니다.</p>
+      </div>
+      <div class="cap-card violet">
+        <div class="cap-icon">💻</div>
+        <h3 class="cap-title">코드 작성 & 디버깅</h3>
+        <p class="cap-desc">Python, JavaScript, Go, Rust 등 주요 언어를 지원합니다. 버그를 찾고, 리팩터링하고, 테스트를 작성합니다.</p>
+      </div>
+      <div class="cap-card">
+        <div class="cap-icon">🔍</div>
+        <h3 class="cap-title">분석 & 리서치</h3>
+        <p class="cap-desc">복잡한 문서를 요약하고, 데이터를 해석하며, 다양한 관점에서 주제를 탐구합니다.</p>
+      </div>
+      <div class="cap-card violet">
+        <div class="cap-icon">🧮</div>
+        <h3 class="cap-title">수학 & 논리</h3>
+        <p class="cap-desc">단계별로 풀이를 보여주며 수식, 증명, 논리 문제를 체계적으로 해결합니다.</p>
+      </div>
+      <div class="cap-card">
+        <div class="cap-icon">🌐</div>
+        <h3 class="cap-title">다국어 번역</h3>
+        <p class="cap-desc">100개 이상의 언어를 문화적 뉘앙스까지 반영하여 자연스럽게 번역합니다.</p>
+      </div>
+      <div class="cap-card violet">
+        <div class="cap-icon">🎯</div>
+        <h3 class="cap-title">전략 & 기획</h3>
+        <p class="cap-desc">비즈니스 전략 수립, 프로젝트 계획, 의사결정 분석에서 구체적인 조언을 제공합니다.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- CONVERSATION -->
+  <section class="conversation-section" id="conversation">
+    <div class="conversation-wrap">
+      <div class="section-eyebrow" style="text-align:center; margin-bottom:16px;">대화 예시</div>
+      <h2 class="section-title" style="text-align:center; margin:0 auto 56px;">이런 대화가 가능합니다</h2>
+
+      <div class="conv-message" id="msg1">
+        <div class="conv-avatar avatar-user">U</div>
+        <div class="conv-bubble user-bubble">
+          <div class="conv-sender user-s">사용자</div>
+          파이썬으로 피보나치 수열을 재귀로 짰는데 너무 느려요. 어떻게 하면 빠르게 할 수 있을까요?
+        </div>
+      </div>
+
+      <div class="conv-message" id="msg2">
+        <div class="conv-avatar avatar-claude">C</div>
+        <div class="conv-bubble">
+          <div class="conv-sender claude">Claude</div>
+          재귀 피보나치는 중복 계산이 많아 O(2ⁿ) 시간 복잡도를 가집니다. 세 가지 방법으로 개선할 수 있어요:<br><br>
+          <strong>1. 메모이제이션</strong> — 이미 계산한 값을 저장해 O(n)으로 줄입니다.<br>
+          <strong>2. 반복문(Bottom-up DP)</strong> — 스택 오버플로우 없이 O(n) 시간, O(1) 공간.<br>
+          <strong>3. 행렬 거듭제곱</strong> — O(log n)으로 대규모 n에서 가장 빠릅니다.<br><br>
+          어떤 방향이 더 맞는지 알려주시면 코드도 작성해 드릴게요.
+        </div>
+      </div>
+
+      <div class="conv-message" id="msg3">
+        <div class="conv-avatar avatar-user">U</div>
+        <div class="conv-bubble user-bubble">
+          <div class="conv-sender user-s">사용자</div>
+          메모이제이션 방법으로 코드 짜주세요!
+        </div>
+      </div>
+
+      <div class="conv-message" id="msg4">
+        <div class="conv-avatar avatar-claude">C</div>
+        <div class="conv-bubble">
+          <div class="conv-sender claude">Claude</div>
+          물론이죠. <code style="background:rgba(139,126,200,0.15);color:#C4B5D4;padding:2px 6px;border-radius:3px;font-size:0.875em;">functools.lru_cache</code>를 쓰면 가장 간결합니다:<br><br>
+          <code style="display:block;background:rgba(0,0,0,0.3);padding:14px 16px;border-radius:6px;font-size:0.85em;line-height:1.6;white-space:pre;overflow-x:auto;">from functools import lru_cache
+
+@lru_cache(maxsize=None)
+def fib(n: int) -> int:
+    if n < 2:
+        return n
+    return fib(n - 1) + fib(n - 2)</code><br>
+          <code>fib(1000)</code>도 즉시 반환합니다. 데코레이터 없이 직접 딕셔너리로 관리하는 버전도 필요하면 말씀해 주세요.
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PHILOSOPHY -->
+  <section class="philosophy-section" id="philosophy">
+    <div>
+      <div class="section-eyebrow">Claude의 철학</div>
+      <blockquote class="philosophy-quote">
+        유용하고, 무해하며,<br />
+        <mark>정직한</mark> AI를<br />
+        만드는 것.
+      </blockquote>
+    </div>
+    <div class="philosophy-body">
+      <p>Anthropic은 AI의 안전성 연구를 핵심 미션으로 삼는 회사입니다. Claude는 그 연구의 산물이자, 실제 세상에서 안전하고 유익한 AI가 가능하다는 증거입니다.</p>
+      <p>Claude는 모르는 것을 모른다고 말하고, 불확실한 것을 불확실하다고 말합니다. 정답보다 정직함이 우선입니다.</p>
+      <ul class="principle-list">
+        <li>헌법적 AI(Constitutional AI)로 가치 기반 훈련</li>
+        <li>인간 피드백을 통한 지속적 개선(RLHF)</li>
+        <li>편향과 환각을 줄이기 위한 적극적 연구</li>
+        <li>사용자 프라이버시와 데이터 보호 최우선</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="cta-section">
+    <h2 class="cta-title">지금 바로 대화를 시작해보세요</h2>
+    <p class="cta-sub">무료로 시작할 수 있습니다. 신용카드 불필요.</p>
+    <a href="https://claude.ai" target="_blank" rel="noopener" class="btn-primary">Claude 무료로 사용하기</a>
+  </section>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="footer-logo">Cl<span>au</span>de <em style="font-style:normal;font-family:system-ui;font-weight:400;font-size:0.85rem;color:var(--text-muted);">by Anthropic</em></div>
+    <div class="footer-note">© 2024 Anthropic PBC. All rights reserved.</div>
+  </footer>
+
+  <script>
+    /* ─── TYPING ANIMATION ─── */
+    const fullText = "물론이죠. 코드를 보여주시면 바로 분석해드릴게요. 어떤 언어인지, 어떤 오류가 발생하는지도 함께 알려주시면 더 빠르게 찾을 수 있어요.";
+    const el = document.getElementById('typingText');
+    let i = 0;
+
+    function type() {
+      if (i < fullText.length) {
+        el.textContent = fullText.slice(0, i + 1);
+        el.insertAdjacentHTML('beforeend', '<span class="cursor"></span>');
+        i++;
+        setTimeout(type, 38 + Math.random() * 24);
+      }
+    }
+
+    setTimeout(type, 1200);
+
+    /* ─── CANVAS: WORD CONSTELLATION ─── */
+    (function() {
+      const canvas = document.getElementById('wordCanvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+
+      const WORDS = ['이해','분석','창의','코드','논리','언어','탐구','추론','대화','글쓰기','수학','번역','전략','협력','아이디어','답변'];
+      const COLORS = ['#E06840','#8B7EC8','#F2EDE3','#C4A882','#9B8EC4'];
+
+      let nodes = [];
+      let W, H;
+
+      function resize() {
+        W = canvas.offsetWidth;
+        H = canvas.offsetHeight;
+        canvas.width = W * window.devicePixelRatio;
+        canvas.height = H * window.devicePixelRatio;
+        ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+        init();
+      }
+
+      function init() {
+        nodes = WORDS.map((word, idx) => ({
+          word,
+          x: 60 + Math.random() * (W - 120),
+          y: 60 + Math.random() * (H - 120),
+          vx: (Math.random() - 0.5) * 0.4,
+          vy: (Math.random() - 0.5) * 0.4,
+          color: COLORS[idx % COLORS.length],
+          size: 11 + Math.random() * 6,
+          alpha: 0.55 + Math.random() * 0.4,
+        }));
+      }
+
+      function draw() {
+        ctx.clearRect(0, 0, W, H);
+
+        // connections
+        for (let a = 0; a < nodes.length; a++) {
+          for (let b = a + 1; b < nodes.length; b++) {
+            const dx = nodes[a].x - nodes[b].x;
+            const dy = nodes[a].y - nodes[b].y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < 160) {
+              const alpha = (1 - dist / 160) * 0.18;
+              ctx.beginPath();
+              ctx.moveTo(nodes[a].x, nodes[a].y);
+              ctx.lineTo(nodes[b].x, nodes[b].y);
+              ctx.strokeStyle = `rgba(139,126,200,${alpha})`;
+              ctx.lineWidth = 1;
+              ctx.stroke();
+            }
+          }
+        }
+
+        // words
+        nodes.forEach(n => {
+          ctx.font = `${n.size}px system-ui, sans-serif`;
+          ctx.fillStyle = n.color;
+          ctx.globalAlpha = n.alpha;
+          ctx.fillText(n.word, n.x, n.y);
+          ctx.globalAlpha = 1;
+        });
+      }
+
+      function tick() {
+        nodes.forEach(n => {
+          n.x += n.vx;
+          n.y += n.vy;
+          if (n.x < 40 || n.x > W - 40) n.vx *= -1;
+          if (n.y < 20 || n.y > H - 20) n.vy *= -1;
+        });
+        draw();
+        requestAnimationFrame(tick);
+      }
+
+      window.addEventListener('resize', resize);
+      resize();
+      tick();
+    })();
+
+    /* ─── SCROLL REVEAL for conversation ─── */
+    const messages = document.querySelectorAll('.conv-message');
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          const delay = Array.from(messages).indexOf(e.target) * 200;
+          setTimeout(() => e.target.classList.add('visible'), delay);
+          observer.unobserve(e.target);
+        }
+      });
+    }, { threshold: 0.2 });
+
+    messages.forEach(m => observer.observe(m));
+  </script>
+</body>
+</html>
