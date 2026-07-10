@@ -36,4 +36,4 @@ EXPOSE 8000
 # docker compose run --rm api alembic upgrade head
 # 단일 컨테이너 운영 기준. 스케일 아웃(2대 이상) 시에는
 # CMD에서 alembic을 제거하고 CI/CD 파이프라인 별도 스텝으로 분리할 것.
-CMD ["sh", "-c", "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers ${WORKERS:-4}"]
+CMD ["sh", "-c", "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000"]

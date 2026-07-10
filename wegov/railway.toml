@@ -2,7 +2,6 @@
 dockerfile = "Dockerfile"
 
 [deploy]
-startCommand = "echo PORT=$PORT && alembic upgrade head 2>&1 && uvicorn app.main:app --host 0.0.0.0 --port 8000 --log-level debug 2>&1"
 healthcheckPath = "/health"
 healthcheckTimeout = 60
 restartPolicyType = "ON_FAILURE"
