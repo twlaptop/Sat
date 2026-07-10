@@ -26,6 +26,16 @@ app.add_middleware(
 app.add_exception_handler(SQLAlchemyError, db_exception_handler)
 app.add_exception_handler(Exception, global_exception_handler)
 
+@app.get("/health", tags=["상태"])
+async def health():
+    return {"status": "ok"}
+
+
+@app.get("/health", tags=["상태"])
+async def health():
+    return {"status": "ok"}
+
+
 app.include_router(auth.router)
 app.include_router(checkin.router)
 app.include_router(checkout.router)
