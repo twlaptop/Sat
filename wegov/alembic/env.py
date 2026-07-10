@@ -18,6 +18,11 @@ def get_url() -> str:
     url = os.getenv("DATABASE_URL")
     if not url:
         raise RuntimeError("DATABASE_URL 환경변수가 설정되지 않았습니다.")
+    # Railway는 postgresql:// 형식으로 제공 → asyncpg 드라이버 형식으로 변환
+    if url.startswith("postgres://"):
+        url = url.replace("postgres://", "postgresql+asyncpg://", 1)
+    elif url.startswith("postgresql://"):
+        url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
     return url
 
 
