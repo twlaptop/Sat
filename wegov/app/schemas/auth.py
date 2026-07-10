@@ -16,4 +16,12 @@ class ActivateRequest(BaseModel):
 # 토큰 응답
 class TokenResponse(BaseModel):
     access_token: str
+    refresh_token: str
     token_type: str = "bearer"
+    worker_id: int
+    name: str
+    role: str
+
+
+class RefreshRequest(BaseModel):
+    refresh_token: str = Field(..., description="로그인 시 받은 refresh_token")

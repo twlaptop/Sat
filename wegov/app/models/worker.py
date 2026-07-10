@@ -73,6 +73,7 @@ class Worker(Base):
     contract_end_date: Mapped[date | None] = mapped_column(Date, nullable=True)        # 계약만료일
     contract_renewal_date: Mapped[date | None] = mapped_column(Date, nullable=True)    # 계약연장예정일
     is_final_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False) # 최종관리자 여부 (admin 중 최상위 — 최대 3명)
+    token_invalidated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True) # 이 시각 이전에 발급된 토큰은 즉시 차단
     profile_image_url: Mapped[str | None] = mapped_column(String, nullable=True)       # 프로필 사진 저장 경로
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)     # 재직 여부 — False = 퇴사 처리 (물리 삭제 금지, 이 값만 바꿈)
     # INSERT 직후 파이썬 객체에는 None → 라우터에서 await db.refresh(worker) 필수

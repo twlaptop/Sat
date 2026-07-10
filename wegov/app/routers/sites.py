@@ -3,7 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.deps import get_current_user, require_admin
+from app.core.deps import get_current_worker, require_admin
 from app.models.site import Site
 from app.schemas.site import SiteCreate, SiteUpdate, SiteResponse
 
@@ -13,7 +13,7 @@ router = APIRouter(prefix="/sites", tags=["사업장"])
 @router.get("", response_model=list[SiteResponse], summary="사업장 목록 조회")
 async def list_sites(
     db: AsyncSession = Depends(get_db),
-    current_user: str = Depends(get_current_user),
+    _=Depends(get_current_worker),
 ):
     result = await db.execute(select(Site).order_by(Site.name))
     return result.scalars().all()

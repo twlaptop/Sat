@@ -4,7 +4,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.core.config import settings
 from app.core.exceptions import lifespan, db_exception_handler, global_exception_handler
 
-from app.routers import auth, checkin, checkout, records, workers, sites, notices, schedules, correction, stats, messages, process_contracts
+from app.routers import auth, checkin, checkout, records, workers, sites, notices, schedules, correction, stats, messages, process_contracts, processes
 
 app = FastAPI(
     title="WeGov 출입기록 API",
@@ -43,3 +43,4 @@ app.include_router(correction.router)
 app.include_router(stats.router)
 app.include_router(messages.router)
 app.include_router(process_contracts.router)
+app.include_router(processes.router)

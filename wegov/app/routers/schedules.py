@@ -1,10 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+import csv, io
+from fastapi import APIRouter, Depends, HTTPException, status, Query, UploadFile, File
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import date
 
 from app.core.database import get_db
-from app.core.deps import get_current_user, require_admin, require_leader_or_above
+from app.core.deps import get_current_worker, require_admin, require_leader_or_above
 from app.models.schedule import Schedule
 from app.schemas.schedule import ScheduleCreate, ScheduleResponse
 
@@ -15,9 +16,9 @@ router = APIRouter(prefix="/schedules", tags=["스케줄"])
 async def get_my_schedules(
     target_date: date = Query(default=None, description="조회 날짜 (미입력 시 오늘)"),
     db: AsyncSession = Depends(get_db),
-    current_user: str = Depends(get_current_user),
+    current_worker=Depends(get_current_worker),
 ):
-    worker_id = int(current_user)
+    worker_id = current_worker.id
     query_date = target_date or date.today()
 
     result = await db.execute(
@@ -73,3 +74,44 @@ async def delete_schedule(
 
     await db.delete(schedule)
     await db.commit()
+
+
+@router.post("/bulk", status_code=status.HTTP_201_CREATED, summary="CSV 스케줄 일괄 업로드 (관리자)")
+async def bulk_upload_schedules(
+    file: UploadFile = File(..., description="CSV 파일 — 헤더: worker_id, date, company, site, process, task"),
+    db: AsyncSession = Depends(get_db),
+    _=Depends(require_admin),
+):
+    content = await file.read()
+    try:
+        text = content.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        text = content.decode("cp949", errors="replace")
+
+    reader = csv.DictReader(io.StringIO(text))
+    required = {"worker_id", "date"}
+    if not required.issubset(set(reader.fieldnames or [])):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"CSV 헤더 오류 — 필수 컬럼: {', '.join(required)}",
+        )
+
+    from datetime import date as date_type
+    created, errors = 0, []
+    for i, row in enumerate(reader, start=2):
+        try:
+            schedule = Schedule(
+                worker_id=int(row["worker_id"]),
+                date=date_type.fromisoformat(row["date"]),
+                company=row.get("company") or None,
+                site=row.get("site") or None,
+                process=row.get("process") or None,
+                task=row.get("task") or None,
+            )
+            db.add(schedule)
+            created += 1
+        except Exception as e:
+            errors.append({"row": i, "error": str(e)})
+
+    await db.commit()
+    return {"created": created, "errors": errors}

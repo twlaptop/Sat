@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime, timezone
 
 from app.core.database import get_db
-from app.core.deps import get_current_user
+from app.core.deps import get_current_worker
 from app.models.work_record import WorkRecord
 from app.schemas.checkout import CheckoutRequest, CheckoutResponse
 
@@ -15,9 +15,9 @@ router = APIRouter(prefix="/checkout", tags=["퇴실"])
 async def checkout(
     body: CheckoutRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: str = Depends(get_current_user),
+    current_worker=Depends(get_current_worker),
 ):
-    worker_id = int(current_user)
+    worker_id = current_worker.id
 
     # 현재 입실 중인 기록 조회
     result = await db.execute(

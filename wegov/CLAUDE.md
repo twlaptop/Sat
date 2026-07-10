@@ -9,11 +9,13 @@ Python 3.12 / FastAPI 0.111.0 / SQLAlchemy 2.0.30 async / PostgreSQL 16
 | 메서드 | 경로 | 설명 | 인증 | 역할 |
 |---|---|---|---|---|
 | GET | /health | 서버 상태 확인 | 불필요 | — |
-| POST | /auth/login | 로그인 (이름+생년월일) | 불필요 | — |
+| POST | /auth/login | 로그인 (이름+생년월일) → role+name+worker_id 반환 | 불필요 | — |
 | POST | /auth/activate | 계정 최초 활성화 (주민번호) | 불필요 | — |
+| POST | /auth/refresh | Refresh Token으로 Access Token 갱신 (자동 로그인) | 불필요 | — |
 | POST | /checkin/manual | 수동 입실 | 필요 | 전체 |
 | POST | /checkin/from-schedule | 스케줄 기반 자동 입실 | 필요 | 전체 |
 | GET | /checkin/today-schedule | 오늘 스케줄 조회 | 필요 | 전체 |
+| GET | /checkin/realtime | 실시간 입실 현황 | 필요 | leader+ |
 | POST | /checkout | 퇴실 | 필요 | 전체 |
 | GET | /records/me | 내 출입기록 조회 | 필요 | 전체 |
 | GET | /records/worker/{id} | 특정 직원 기록 조회 | 필요 | leader+ |
@@ -28,7 +30,8 @@ Python 3.12 / FastAPI 0.111.0 / SQLAlchemy 2.0.30 async / PostgreSQL 16
 | DELETE | /sites/{id} | 사업장 삭제 | 필요 | admin |
 | GET | /schedules/me | 내 스케줄 조회 | 필요 | 전체 |
 | GET | /schedules/worker/{id} | 특정 직원 스케줄 조회 | 필요 | leader+ |
-| POST | /schedules | 스케줄 등록 | 필요 | admin |
+| POST | /schedules | 스케줄 등록 (건별) | 필요 | admin |
+| POST | /schedules/bulk | CSV 스케줄 일괄 업로드 | 필요 | admin |
 | DELETE | /schedules/{id} | 스케줄 삭제 | 필요 | admin |
 | GET | /notices | 공지사항 목록 | 필요 | 전체 |
 | POST | /notices | 공지사항 등록 | 필요 | admin |
@@ -50,6 +53,7 @@ Python 3.12 / FastAPI 0.111.0 / SQLAlchemy 2.0.30 async / PostgreSQL 16
 | GET | /process-contracts/lookup | 사업장+공정+라인 단건 조회 | 필요 | 전체 |
 | POST | /process-contracts | 계약시간 등록 | 필요 | admin |
 | DELETE | /process-contracts/{id} | 계약시간 삭제 | 필요 | admin |
+| GET | /processes | 사업장별 공정 목록 조회 | 필요 | 전체 |
 
 ## 모델 목록
 
@@ -68,34 +72,69 @@ Python 3.12 / FastAPI 0.111.0 / SQLAlchemy 2.0.30 async / PostgreSQL 16
 
 ## 핵심 설계 결정
 
+### 인증 / 보안
+- JWT sub: `str(worker.id)` 값 사용, 토큰에 `iat`(발급 시각) 포함
+- Access Token 유효시간: 120분 (기본값)
+- Refresh Token 유효시간: 30일 — `POST /auth/refresh`로 갱신
+- 로그인 응답: `access_token`, `refresh_token`, `worker_id`, `name`, `role` 반환
+- `token_invalidated_at`: 퇴직·역할 변경 시 이 시각 기록 → 이전 발급 토큰 즉시 차단
+- `get_current_user` 반환 타입: `(sub: str, iat: int | None)` 튜플
+- `get_current_worker` 반환 타입: Worker 객체 — 모든 인증 필요 엔드포인트에서 사용 (is_active + token_invalidated_at 동시 체크)
+- `/auth/refresh`: payload의 `type == "refresh"` 클레임 검증 — access_token으로 갱신 시도 차단
+- `/auth/activate`: 동명이인 시 `scalars().first()` 사용 — 500 에러 방지
+- `POST /messages`: `receiver_id` 생략 가능 — 생략 시 is_final_admin=True 관리자에게 자동 전송
+- `POST /checkin/from-schedule`: `shift_type` 파라미터 추가 — 스케줄 기반 입실 시 근무표 직접 선택 가능
+
+### 역할 접근 제어
+- `require_admin` / `require_leader_or_above` (app/core/deps.py)
+  - admin: 직원·사업장 등록·수정·삭제, 수정 요청 승인, 공정 계약시간 관리, 스케줄 관리
+  - leader+: 직원 목록·상세, 타직원 기록·스케줄, 통계, 수정 대기 목록, 실시간 현황
+  - 전체: 본인 기록·스케줄·공지·수정 요청·채팅·공정 계약시간 조회
+- `is_final_admin`: admin 중 최상위 최종관리자 여부 (최대 3명)
+
+### 데이터 무결성
 - SQLAlchemy 2.0 async 스타일 (`async with session`)
 - Worker 조회: `select(Worker).where(Worker.id == id, Worker.active_filter())`
 - Worker 물리 삭제 금지 — `is_active=False` soft delete만
 - WorkRecord 물리 삭제 금지 — `is_voided=True` soft delete만
 - `duration_minutes`: PostgreSQL STORED Computed 컬럼 — checkout 후 `await db.refresh(record)` 필수
-- JWT sub: `str(worker.id)` 값 사용
-- `get_current_user` 반환 타입: str (JWT sub)
-- `get_current_worker` 반환 타입: Worker 객체 (역할 체크 필요 시 사용)
-- 역할 접근 제어: `require_admin` / `require_leader_or_above` (app/core/deps.py)
-  - admin: 직원·사업장 등록·수정·삭제, 수정 요청 승인, 공정 계약시간 관리
-  - leader+: 직원 목록·상세, 타직원 기록, 통계, 수정 대기 목록
-  - 전체: 본인 기록·스케줄·공지·수정 요청·채팅·공정 계약시간 조회
-- `is_final_admin`: admin 중 최상위 최종관리자 여부 (최대 3명)
-- 재직상태 표준값: 재직/수습/수습해지/퇴사예정/휴직/입사예정/신입/퇴사
-- 업무진행상태 표준값: 입사교육완료/수습진행중/수습완료/퇴사예정/정상근무
-- 지각 판정: RecordResponse.is_late — 근무표별 기준시각(D/주=06:00, S/야=18:00, O=08:00)
 - GPS 미적용 — 사용자가 직접 사업장·공정 선택하는 방식
-- correction 수정 유형: CHECKIN_MISS / CHECKOUT_MISS / WRONG_PRESS / LONG_STAY
-- 테스트 데이터:
-  - `scripts/seed.py` — 사업장 8개·직원 10명·출입기록·스케줄
-  - `scripts/seed_process_contracts.py` — 공정별 계약시간 112건
-  - 실행: `docker compose -f docker-compose.dev.yml exec -e PYTHONPATH=/app api python /app/scripts/<파일명>`
-- Worker 추가 필드: email, english_name, outsourcing_company, probation_end_date, contract_end_date, contract_renewal_date, is_final_admin
-- 재직상태 표준값: 재직/수습/수습해지/퇴사예정/휴직/입사예정/신입/퇴사 (Literal 검증)
-- 업무진행상태 표준값: 입사교육완료/수습진행중/수습완료/퇴사예정/정상근무 (Literal 검증)
-- 지각 판정: RecordResponse.is_late 자동 계산 — D/주=06:00, S/야=18:00, O=08:00 기준
-- 공정별 계약시간: process_contracts 테이블, /process-contracts/lookup?site_name=&process=&line= 으로 조회
-- 조직도 역할 매핑: emp→worker, hr→leader, admin→admin, 최종관리자→is_final_admin=True
+
+### 입력값 검증 (Literal)
+- `role`: worker / leader / admin
+- `shift_type`: D / S / O / 주 / 야
+- `correction_type`: CHECKIN_MISS / CHECKOUT_MISS / WRONG_PRESS / LONG_STAY
+- `status`(재직상태): 재직 / 수습 / 수습해지 / 퇴사예정 / 휴직 / 입사예정 / 신입 / 퇴사
+- `work_status`(업무진행상태): 입사교육완료 / 수습진행중 / 수습완료 / 퇴사예정 / 정상근무
+
+### 출입기록 관련
+- 지각 판정: RecordResponse.is_late — KST 기준, 근무표별 기준시각(D/주=06:00, S/야=18:00, O=08:00)
+- is_voided=True 기록은 모든 조회 API에서 자동 제외
+- round(회차): 날짜 기준 is_voided 제외 카운트 + 1
+
+### Worker 필드
+- 기본: name, company, phone, role, status, work_status, team, group_name, squad, line
+- 인증: birth_date(로그인 비밀번호), resident_number_hash(주민번호 bcrypt)
+- 추가: email, english_name, outsourcing_company, probation_end_date, contract_end_date, contract_renewal_date, is_final_admin, token_invalidated_at
+
+### 공정별 계약시간
+- process_contracts 테이블 (112건 시드 데이터)
+- `/processes?site_name=` — 사업장별 공정 목록 전용 API
+- `/process-contracts/lookup?site_name=&process=&line=` — 퇴실 알람 타이머용
+
+### 조직도 역할 매핑 (엑스티 조직도 DB 기준)
+- emp → worker, hr → leader, admin → admin
+- 최종관리자(Y) → is_final_admin=True (최대 3명)
+
+### 감사 로그
+- `save_audit_log()` — 직원 등록·수정·퇴사, 수정 요청 승인·반려 시 audit_logs 기록
+
+### 테스트 데이터
+- `scripts/seed.py` — 사업장 8개·직원 10명·출입기록·스케줄
+- `scripts/seed_process_contracts.py` — 공정별 계약시간 112건
+- 실행: `docker compose -f docker-compose.dev.yml exec -e PYTHONPATH=/app api python /app/scripts/<파일명>`
+- 테스트 계정: 김관리/800101(admin), 박리더/850215(leader), 최현장/900510(worker)
+- 테스트 주민번호: 김관리=8001011234561, 최현장=9005101234561
 
 ## 환경변수
 
@@ -104,7 +143,7 @@ Python 3.12 / FastAPI 0.111.0 / SQLAlchemy 2.0.30 async / PostgreSQL 16
 | DATABASE_URL | PostgreSQL 접속 URL (asyncpg 형식 필수) |
 | JWT_SECRET_KEY | JWT 서명 키 |
 | JWT_ALGORITHM | HS256 |
-| JWT_ACCESS_TOKEN_EXPIRE_MINUTES | 토큰 만료 시간(분) |
+| JWT_ACCESS_TOKEN_EXPIRE_MINUTES | 토큰 만료 시간(분) — 기본값: 120 |
 | CORS_ORIGINS | 허용 출처 (쉼표 구분, 개발: *) |
 
 ## 배포
@@ -114,5 +153,5 @@ Python 3.12 / FastAPI 0.111.0 / SQLAlchemy 2.0.30 async / PostgreSQL 16
   - docs: https://sat-production-0f30.up.railway.app/docs
 - 개발 실행: `docker compose -f docker-compose.dev.yml up`
 - 마이그레이션 생성(개발): `docker compose -f docker-compose.dev.yml run --rm api alembic revision --autogenerate -m "설명"`
-- 마이그레이션 적용(개발): `docker compose -f docker-compose.dev.yml run --rm api alembic upgrade head`
+- 마이그레이션 적용(개발): `docker compose -f docker-compose.dev.yml exec api alembic upgrade head`
 - 마이그레이션 적용(프로덕션): Railway 배포 시 Dockerfile CMD에서 자동 실행

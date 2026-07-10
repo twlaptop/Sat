@@ -3,7 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.deps import get_current_user, require_admin
+from app.core.deps import get_current_worker, require_admin
 from app.models.notice import Notice
 from app.schemas.notice import NoticeCreate, NoticeUpdate, NoticeResponse
 
@@ -15,7 +15,7 @@ async def list_notices(
     page: int = Query(1, ge=1, description="페이지 번호"),
     limit: int = Query(20, ge=1, le=100, description="페이지당 항목 수"),
     db: AsyncSession = Depends(get_db),
-    current_user: str = Depends(get_current_user),
+    _=Depends(get_current_worker),
 ):
     offset = (page - 1) * limit
     result = await db.execute(select(Notice).order_by(Notice.created_at.desc()).offset(offset).limit(limit))

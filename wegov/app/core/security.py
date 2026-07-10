@@ -20,12 +20,21 @@ def hash_password(plain: str) -> str:
     return pwd_context.hash(plain)
 
 
-def create_access_token(subject: str) -> str:
-    expire = datetime.now(timezone.utc) + timedelta(
-        minutes=settings.jwt_access_token_expire_minutes
-    )
+def create_refresh_token(subject: str) -> str:
+    now = datetime.now(timezone.utc)
+    expire = now + timedelta(days=30)
     return jwt.encode(
-        {"sub": subject, "exp": expire},
+        {"sub": subject, "exp": expire, "iat": now, "type": "refresh"},
+        settings.jwt_secret_key,
+        algorithm=settings.jwt_algorithm,
+    )
+
+
+def create_access_token(subject: str) -> str:
+    now = datetime.now(timezone.utc)
+    expire = now + timedelta(minutes=settings.jwt_access_token_expire_minutes)
+    return jwt.encode(
+        {"sub": subject, "exp": expire, "iat": now},
         settings.jwt_secret_key,
         algorithm=settings.jwt_algorithm,
     )
@@ -52,4 +61,5 @@ def decode_access_token(token: str) -> str:
         if settings.env == "development":
             logger.warning("[JWT] sub 클레임 누락")
         raise JWTError("sub missing")
-    return sub
+    iat: int | None = payload.get("iat")
+    return sub, iat

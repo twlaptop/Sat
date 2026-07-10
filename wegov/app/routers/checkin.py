@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select, func
+from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
-from datetime import date
+from datetime import date, datetime, timezone, timedelta
 
 from app.core.database import get_db
-from app.core.deps import get_current_user
+from app.core.deps import get_current_worker, require_leader_or_above
 from app.models.worker import Worker
 from app.models.work_record import WorkRecord
 from app.models.schedule import Schedule
@@ -53,10 +53,9 @@ async def _next_round(worker_id: int, db: AsyncSession) -> int:
 async def checkin_manual(
     body: CheckinRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: str = Depends(get_current_user),
+    current_worker=Depends(get_current_worker),
 ):
-    worker_id = int(current_user)
-    await _get_worker(worker_id, db)
+    worker_id = current_worker.id
     await _check_already_checkedin(worker_id, db)
     round_no = await _next_round(worker_id, db)
 
@@ -77,10 +76,9 @@ async def checkin_manual(
 async def checkin_from_schedule(
     body: CheckinFromScheduleRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: str = Depends(get_current_user),
+    current_worker=Depends(get_current_worker),
 ):
-    worker_id = int(current_user)
-    await _get_worker(worker_id, db)
+    worker_id = current_worker.id
     await _check_already_checkedin(worker_id, db)
 
     # 스케줄 조회
@@ -102,7 +100,7 @@ async def checkin_from_schedule(
         round=round_no,
         site_name=schedule.site or "",
         process=schedule.process or "",
-        shift_type="D",  # 스케줄에 shift_type 없으면 기본값 D
+        shift_type=body.shift_type,
     )
     db.add(record)
     await db.commit()
@@ -113,9 +111,9 @@ async def checkin_from_schedule(
 @router.get("/today-schedule", summary="오늘 스케줄 조회")
 async def get_today_schedule(
     db: AsyncSession = Depends(get_db),
-    current_user: str = Depends(get_current_user),
+    current_worker=Depends(get_current_worker),
 ):
-    worker_id = int(current_user)
+    worker_id = current_worker.id
     result = await db.execute(
         select(Schedule).where(
             Schedule.worker_id == worker_id,
@@ -124,3 +122,55 @@ async def get_today_schedule(
     )
     schedule = result.scalar_one_or_none()
     return schedule
+
+
+@router.get("/realtime", summary="실시간 입실 현황 (관리자/리더)")
+async def realtime_status(
+    db: AsyncSession = Depends(get_db),
+    _=Depends(require_leader_or_above),
+):
+    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+
+    result = await db.execute(
+        select(WorkRecord, Worker)
+        .join(Worker, WorkRecord.worker_id == Worker.id)
+        .where(
+            and_(
+                WorkRecord.checkout_at.is_(None),
+                WorkRecord.is_voided.is_(False),
+                WorkRecord.checkin_at >= today_start,
+            )
+        )
+        .order_by(WorkRecord.checkin_at.desc())
+    )
+    rows = result.all()
+
+    daily_result = await db.execute(
+        select(func.count(WorkRecord.id), func.sum(WorkRecord.duration_minutes))
+        .where(
+            and_(
+                WorkRecord.checkin_at >= today_start,
+                WorkRecord.is_voided.is_(False),
+                WorkRecord.checkout_at.isnot(None),
+            )
+        )
+    )
+    daily = daily_result.one()
+
+    return {
+        "current_checkin_count": len(rows),
+        "daily_total_entries": daily[0] or 0,
+        "daily_total_minutes": daily[1] or 0,
+        "current_workers": [
+            {
+                "worker_id": record.worker_id,
+                "name": worker.name,
+                "team": worker.team,
+                "site_name": record.site_name,
+                "process": record.process,
+                "checkin_at": record.checkin_at,
+                "round": record.round,
+            }
+            for record, worker in rows
+        ],
+    }

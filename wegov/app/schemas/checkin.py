@@ -13,6 +13,7 @@ class CheckinRequest(BaseModel):
 # 스케줄 기반 자동 입실 요청
 class CheckinFromScheduleRequest(BaseModel):
     schedule_id: int = Field(..., description="오늘 스케줄 ID")
+    shift_type: Literal["D", "S", "O", "주", "야"] = Field("D", description="근무표 유형 (기본값: D)")
 
 
 # 입실 응답

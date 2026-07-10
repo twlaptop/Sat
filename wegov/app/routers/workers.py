@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
+from datetime import datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -75,8 +76,12 @@ async def update_worker(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="직원을 찾을 수 없습니다.")
 
     changed = list(body.model_dump(exclude_unset=True).keys())
+    role_changed = "role" in changed
     for field, value in body.model_dump(exclude_unset=True).items():
         setattr(worker, field, value)
+
+    if role_changed:
+        worker.token_invalidated_at = datetime.now(timezone.utc)
 
     await db.commit()
     await db.refresh(worker)
@@ -99,5 +104,6 @@ async def deactivate_worker(
 
     worker.is_active = False
     worker.status = "퇴사"
+    worker.token_invalidated_at = datetime.now(timezone.utc)
     await db.commit()
     await save_audit_log(actor=str(admin.id), action="직원 퇴사 처리", target_id=worker_id, detail=f"이름: {worker.name}")

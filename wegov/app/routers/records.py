@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import date, timedelta
 
 from app.core.database import get_db
-from app.core.deps import get_current_user, require_leader_or_above
+from app.core.deps import get_current_worker, require_leader_or_above
 from app.models.work_record import WorkRecord
 from app.schemas.record import RecordResponse
 
@@ -17,9 +17,9 @@ async def get_my_records(
     page: int = Query(1, ge=1, description="페이지 번호"),
     limit: int = Query(20, ge=1, le=100, description="페이지당 항목 수"),
     db: AsyncSession = Depends(get_db),
-    current_user: str = Depends(get_current_user),
+    current_worker=Depends(get_current_worker),
 ):
-    worker_id = int(current_user)
+    worker_id = current_worker.id
     query_date = target_date or date.today()
     offset = (page - 1) * limit
 

@@ -3,7 +3,7 @@ from pydantic import BaseModel, Field
 
 
 class MessageSend(BaseModel):
-    receiver_id: int = Field(..., description="수신자 직원 ID")
+    receiver_id: int | None = Field(None, description="수신자 직원 ID — 생략 시 최종관리자에게 자동 전송")
     content: str = Field(..., min_length=1, max_length=2000, description="메시지 내용")
 
 

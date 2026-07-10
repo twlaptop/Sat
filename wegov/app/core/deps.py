@@ -1,3 +1,4 @@
+from datetime import datetime, timezone, timedelta
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError
@@ -19,7 +20,7 @@ _CREDENTIALS_EXCEPTION = HTTPException(
 
 async def get_current_user(
     token: str = Depends(oauth2_scheme),
-) -> str:
+) -> tuple[str, int | None]:
     try:
         return decode_access_token(token)
     except JWTError as e:
@@ -33,16 +34,24 @@ async def get_current_user(
 
 
 async def get_current_worker(
-    current_user: str = Depends(get_current_user),
+    token_data: tuple = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     from app.models.worker import Worker
+    worker_id, iat = token_data
     result = await db.execute(
-        select(Worker).where(Worker.id == int(current_user), Worker.active_filter())
+        select(Worker).where(Worker.id == int(worker_id), Worker.active_filter())
     )
     worker = result.scalar_one_or_none()
     if worker is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="인증 정보가 올바르지 않습니다.")
+
+    # 토큰 발급 시각이 무효화 시각보다 이전이면 차단
+    if worker.token_invalidated_at and iat:
+        issued_at = datetime.fromtimestamp(iat, tz=timezone.utc)
+        if issued_at < worker.token_invalidated_at:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="토큰이 만료됐습니다. 다시 로그인해주세요.")
+
     return worker
 
 

@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import datetime, timezone, date
 
 from app.core.database import get_db
-from app.core.deps import get_current_user, require_admin, require_leader_or_above
+from app.core.deps import get_current_worker, require_admin, require_leader_or_above
 from app.core.audit import save_audit_log
 from app.models.correction import Correction
 from app.models.work_record import WorkRecord
@@ -17,9 +17,9 @@ router = APIRouter(prefix="/corrections", tags=["수정 요청"])
 async def create_correction(
     body: CorrectionRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: str = Depends(get_current_user),
+    current_worker=Depends(get_current_worker),
 ):
-    correction = Correction(worker_id=int(current_user), **body.model_dump())
+    correction = Correction(worker_id=current_worker.id, **body.model_dump())
     db.add(correction)
     await db.commit()
     await db.refresh(correction)
@@ -33,7 +33,7 @@ async def get_my_corrections(
 ):
     result = await db.execute(
         select(Correction)
-        .where(Correction.worker_id == int(current_user))
+        .where(Correction.worker_id == current_worker.id)
         .order_by(Correction.created_at.desc())
     )
     return result.scalars().all()
