@@ -1,0 +1,28 @@
+FROM python:3.12-slim
+
+# pyc 파일 생성 금지, 로그 버퍼링 끔
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc musl-dev libffi-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt .
+
+# BuildKit 캐시 마운트: requirements.txt가 바뀌어도 이미 다운로드된 패키지는 캐시에서 즉시 설치
+# gcc는 컴파일 후 불필요하므로 즉시 제거하여 이미지 크기 감소
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install -r requirements.txt \
+    && apt-get purge -y gcc musl-dev libffi-dev \
+    && apt-get autoremove -y \
+    && rm -rf /var/lib/apt/lists/*
+
+EXPOSE 8000
+# 개발 환경: 코드는 바인드 마운트(.:/app)로 주입되므로 COPY 없음.
+# --reload: 코드 저장 시 서버 자동 재시작 (Windows/WSL2 환경은 WATCHFILES_FORCE_POLLING=true 필요)
+# exec: uvicorn이 PID 1을 대체하여 SIGTERM 즉시 수신 → Graceful Shutdown 보장
+# alembic revision 생성: docker compose -f docker-compose.dev.yml run --rm api alembic revision --autogenerate -m "설명"
+CMD ["sh", "-c", "alembic upgrade head && exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"]

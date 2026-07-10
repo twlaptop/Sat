@@ -1,0 +1,67 @@
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.database import get_db
+from app.core.deps import get_current_user
+from app.models.notice import Notice
+from app.schemas.notice import NoticeCreate, NoticeUpdate, NoticeResponse
+
+router = APIRouter(prefix="/notices", tags=["공지사항"])
+
+
+@router.get("", response_model=list[NoticeResponse], summary="공지사항 목록 조회")
+async def list_notices(
+    db: AsyncSession = Depends(get_db),
+    current_user: str = Depends(get_current_user),
+):
+    result = await db.execute(select(Notice).order_by(Notice.created_at.desc()))
+    return result.scalars().all()
+
+
+@router.post("", response_model=NoticeResponse, status_code=status.HTTP_201_CREATED, summary="공지사항 등록 (관리자)")
+async def create_notice(
+    body: NoticeCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: str = Depends(get_current_user),
+):
+    notice = Notice(**body.model_dump(), created_by=current_user)
+    db.add(notice)
+    await db.commit()
+    await db.refresh(notice)
+    return notice
+
+
+@router.patch("/{notice_id}", response_model=NoticeResponse, summary="공지사항 수정 (관리자)")
+async def update_notice(
+    notice_id: int,
+    body: NoticeUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: str = Depends(get_current_user),
+):
+    result = await db.execute(select(Notice).where(Notice.id == notice_id))
+    notice = result.scalar_one_or_none()
+    if notice is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="공지사항을 찾을 수 없습니다.")
+
+    for field, value in body.model_dump(exclude_unset=True).items():
+        setattr(notice, field, value)
+
+    await db.commit()
+    await db.refresh(notice)
+    return notice
+
+
+@router.delete("/{notice_id}", status_code=status.HTTP_204_NO_CONTENT, summary="공지사항 삭제 (관리자)")
+async def delete_notice(
+    notice_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: str = Depends(get_current_user),
+):
+    result = await db.execute(select(Notice).where(Notice.id == notice_id))
+    notice = result.scalar_one_or_none()
+    if notice is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="공지사항을 찾을 수 없습니다.")
+
+    await db.delete(notice)
+    await db.commit()

@@ -1,0 +1,12 @@
+# 로그
+wegov.log*
+
+# 환경변수
+.env
+.env.dev
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
