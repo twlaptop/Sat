@@ -11,7 +11,7 @@ from openpyxl.styles import Font, Alignment, PatternFill
 from openpyxl.utils import get_column_letter
 
 from app.core.database import get_db
-from app.core.deps import get_current_user
+from app.core.deps import require_leader_or_above
 from app.models.work_record import WorkRecord
 from app.models.worker import Worker
 from app.models.correction import Correction
@@ -27,7 +27,7 @@ async def stats_by_process(
     start_date: date = Query(..., description="시작 날짜"),
     end_date: date = Query(..., description="종료 날짜"),
     db: AsyncSession = Depends(get_db),
-    current_user: str = Depends(get_current_user),
+    _=Depends(require_leader_or_above),
 ):
     result = await db.execute(
         select(
@@ -69,7 +69,7 @@ async def stats_by_site(
     start_date: date = Query(..., description="시작 날짜"),
     end_date: date = Query(..., description="종료 날짜"),
     db: AsyncSession = Depends(get_db),
-    current_user: str = Depends(get_current_user),
+    _=Depends(require_leader_or_above),
 ):
     result = await db.execute(
         select(
@@ -109,7 +109,7 @@ async def stats_by_worker(
     year: int = Query(..., description="연도"),
     month: int = Query(..., description="월"),
     db: AsyncSession = Depends(get_db),
-    current_user: str = Depends(get_current_user),
+    _=Depends(require_leader_or_above),
 ):
     start = date(year, month, 1)
     end = date(year + 1, 1, 1) if month == 12 else date(year, month + 1, 1)
@@ -186,7 +186,7 @@ async def download_excel(
     year: int = Query(..., description="연도"),
     month: int = Query(..., description="월"),
     db: AsyncSession = Depends(get_db),
-    current_user: str = Depends(get_current_user),
+    _=Depends(require_leader_or_above),
 ):
     start = date(year, month, 1)
     end = date(year + 1, 1, 1) if month == 12 else date(year, month + 1, 1)

@@ -24,6 +24,7 @@ async def checkout(
         select(WorkRecord).where(
             WorkRecord.worker_id == worker_id,
             WorkRecord.checkout_at.is_(None),
+            WorkRecord.is_voided.is_(False),
         )
     )
     record = result.scalar_one_or_none()

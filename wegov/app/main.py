@@ -4,7 +4,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.core.config import settings
 from app.core.exceptions import lifespan, db_exception_handler, global_exception_handler
 
-from app.routers import auth, checkin, checkout, records, workers, sites, notices, schedules, correction, stats
+from app.routers import auth, checkin, checkout, records, workers, sites, notices, schedules, correction, stats, messages, process_contracts
 
 app = FastAPI(
     title="WeGov 출입기록 API",
@@ -31,11 +31,6 @@ async def health():
     return {"status": "ok"}
 
 
-@app.get("/health", tags=["상태"])
-async def health():
-    return {"status": "ok"}
-
-
 app.include_router(auth.router)
 app.include_router(checkin.router)
 app.include_router(checkout.router)
@@ -46,3 +41,5 @@ app.include_router(notices.router)
 app.include_router(schedules.router)
 app.include_router(correction.router)
 app.include_router(stats.router)
+app.include_router(messages.router)
+app.include_router(process_contracts.router)

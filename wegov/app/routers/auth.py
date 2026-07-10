@@ -16,13 +16,14 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(Worker).where(
             Worker.name == body.name,
+            Worker.birth_date == body.birth_date,
             Worker.active_filter(),
         )
     )
-    worker = result.scalar_one_or_none()
+    worker = result.scalars().first()
 
     # 직원 없거나 생년월일 불일치 → 동일한 오류 메시지 (보안상 어느 쪽인지 알려주지 않음)
-    if worker is None or worker.birth_date != body.birth_date:
+    if worker is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="이름 또는 생년월일이 올바르지 않습니다.",

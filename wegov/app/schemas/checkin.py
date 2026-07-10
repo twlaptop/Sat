@@ -1,12 +1,13 @@
 from pydantic import BaseModel, Field
 from datetime import datetime
+from typing import Literal
 
 
 # 수동 입실 요청
 class CheckinRequest(BaseModel):
     site_name: str = Field(..., description="사업장명 (예: 삼성전자 온양사업장)")
     process: str = Field(..., description="공정명 (예: COW, 4라인 몰드 세정)")
-    shift_type: str = Field(..., description="근무표 유형: D / S / O / 주 / 야")
+    shift_type: Literal["D", "S", "O", "주", "야"] = Field(..., description="근무표 유형: D / S / O / 주 / 야")
 
 
 # 스케줄 기반 자동 입실 요청

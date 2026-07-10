@@ -17,6 +17,7 @@ class CheckoutResponse(BaseModel):
     checkin_at: datetime
     checkout_at: datetime
     duration_minutes: int | None
+    is_voided: bool
     note: str | None
 
     class Config:

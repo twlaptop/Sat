@@ -43,10 +43,6 @@ class Worker(Base):
         Index("ix_workers_active", "id", postgresql_where=text("is_active = TRUE")),
     )
 
-    # 동시에 같은 직원 정보를 두 사람이 수정하면 충돌 감지
-    # → 나중에 저장하는 쪽에 "이미 누군가 수정했어요" 경고
-    __mapper_args__ = {"version_id_col": "version"}
-
     # --------------------------------------------------------
     # 명부 칸(컬럼) 설계
     # nullable=False → 반드시 채워야 하는 칸
@@ -70,6 +66,13 @@ class Worker(Base):
     blood_type: Mapped[str | None] = mapped_column(String(5), nullable=True)           # 혈액형
     gender: Mapped[str | None] = mapped_column(String(10), nullable=True)              # 성별
     job_title: Mapped[str | None] = mapped_column(String(100), nullable=True)          # 직무명
+    email: Mapped[str | None] = mapped_column(String(200), nullable=True)              # 개인 이메일
+    english_name: Mapped[str | None] = mapped_column(String(100), nullable=True)      # 영문이름
+    outsourcing_company: Mapped[str | None] = mapped_column(String(100), nullable=True) # 아웃소싱업체명
+    probation_end_date: Mapped[date | None] = mapped_column(Date, nullable=True)       # 수습종료일
+    contract_end_date: Mapped[date | None] = mapped_column(Date, nullable=True)        # 계약만료일
+    contract_renewal_date: Mapped[date | None] = mapped_column(Date, nullable=True)    # 계약연장예정일
+    is_final_admin: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False) # 최종관리자 여부 (admin 중 최상위 — 최대 3명)
     profile_image_url: Mapped[str | None] = mapped_column(String, nullable=True)       # 프로필 사진 저장 경로
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)     # 재직 여부 — False = 퇴사 처리 (물리 삭제 금지, 이 값만 바꿈)
     # INSERT 직후 파이썬 객체에는 None → 라우터에서 await db.refresh(worker) 필수

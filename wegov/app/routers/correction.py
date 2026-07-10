@@ -1,17 +1,16 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date
 
 from app.core.database import get_db
-from app.core.deps import get_current_user
+from app.core.deps import get_current_user, require_admin, require_leader_or_above
+from app.core.audit import save_audit_log
 from app.models.correction import Correction
 from app.models.work_record import WorkRecord
 from app.schemas.correction import CorrectionRequest, CorrectionResolveRequest, CorrectionResponse
 
 router = APIRouter(prefix="/corrections", tags=["수정 요청"])
-
-VALID_TYPES = {"CHECKIN_MISS", "CHECKOUT_MISS", "WRONG_PRESS", "LONG_STAY"}
 
 
 @router.post("", response_model=CorrectionResponse, status_code=status.HTTP_201_CREATED, summary="수정 요청 등록")
@@ -20,11 +19,6 @@ async def create_correction(
     db: AsyncSession = Depends(get_db),
     current_user: str = Depends(get_current_user),
 ):
-    if body.correction_type not in VALID_TYPES:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"유효하지 않은 수정 유형입니다. 허용값: {', '.join(VALID_TYPES)}",
-        )
     correction = Correction(worker_id=int(current_user), **body.model_dump())
     db.add(correction)
     await db.commit()
@@ -48,7 +42,7 @@ async def get_my_corrections(
 @router.get("/pending", response_model=list[CorrectionResponse], summary="승인 대기 목록 (관리자/리더)")
 async def get_pending_corrections(
     db: AsyncSession = Depends(get_db),
-    current_user: str = Depends(get_current_user),
+    _=Depends(require_leader_or_above),
 ):
     result = await db.execute(
         select(Correction)
@@ -63,7 +57,7 @@ async def resolve_correction(
     correction_id: int,
     body: CorrectionResolveRequest,
     db: AsyncSession = Depends(get_db),
-    current_user: str = Depends(get_current_user),
+    admin=Depends(require_admin),
 ):
     if body.action not in {"approve", "reject"}:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="action은 approve 또는 reject 이어야 합니다.")
@@ -76,7 +70,7 @@ async def resolve_correction(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="이미 처리된 요청입니다.")
 
     correction.status = "approved" if body.action == "approve" else "rejected"
-    correction.resolved_by = current_user
+    correction.resolved_by = str(admin.id)
     correction.resolved_at = datetime.now(timezone.utc)
 
     if body.action == "approve":
@@ -84,6 +78,12 @@ async def resolve_correction(
 
     await db.commit()
     await db.refresh(correction)
+    await save_audit_log(
+        actor=str(admin.id),
+        action=f"수정 요청 {'승인' if body.action == 'approve' else '반려'}",
+        target_id=correction_id,
+        detail=f"유형: {correction.correction_type}",
+    )
     return correction
 
 
@@ -93,15 +93,18 @@ async def _apply_correction(correction: Correction, db: AsyncSession) -> None:
     if correction.correction_type == "CHECKIN_MISS":
         if not correction.requested_checkin_at:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="입실 누락 수정에는 요청 입실 시각이 필요합니다.")
+        target_date = correction.requested_checkin_at.date() if correction.requested_checkin_at else date.today()
         result = await db.execute(
-            select(WorkRecord)
-            .where(WorkRecord.worker_id == correction.worker_id)
-            .order_by(WorkRecord.round.desc()).limit(1)
+            select(func.count(WorkRecord.id)).where(
+                WorkRecord.worker_id == correction.worker_id,
+                func.date(WorkRecord.checkin_at) == target_date,
+                WorkRecord.is_voided.is_(False),
+            )
         )
-        last = result.scalar_one_or_none()
+        existing_count = result.scalar() or 0
         db.add(WorkRecord(
             worker_id=correction.worker_id,
-            round=(last.round + 1) if last else 1,
+            round=existing_count + 1,
             site_name=correction.site_name or "",
             process=correction.process or "",
             shift_type=correction.shift_type or "D",

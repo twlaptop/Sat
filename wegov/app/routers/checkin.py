@@ -28,6 +28,7 @@ async def _check_already_checkedin(worker_id: int, db: AsyncSession) -> None:
         select(WorkRecord).where(
             WorkRecord.worker_id == worker_id,
             WorkRecord.checkout_at.is_(None),
+            WorkRecord.is_voided.is_(False),
         )
     )
     if result.scalar_one_or_none():
@@ -39,9 +40,10 @@ async def _check_already_checkedin(worker_id: int, db: AsyncSession) -> None:
 
 async def _next_round(worker_id: int, db: AsyncSession) -> int:
     result = await db.execute(
-        select(func.count()).where(
+        select(func.count(WorkRecord.id)).where(
             WorkRecord.worker_id == worker_id,
             func.date(WorkRecord.checkin_at) == date.today(),
+            WorkRecord.is_voided.is_(False),
         )
     )
     return (result.scalar() or 0) + 1

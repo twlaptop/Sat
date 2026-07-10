@@ -6,3 +6,5 @@ from app.models.site import Site
 from app.models.schedule import Schedule
 from app.models.worker_document import WorkerDocument
 from app.models.correction import Correction
+from app.models.message import Message
+from app.models.process_contract import ProcessContract

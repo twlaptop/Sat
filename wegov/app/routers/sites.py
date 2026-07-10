@@ -3,7 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.deps import get_current_user
+from app.core.deps import get_current_user, require_admin
 from app.models.site import Site
 from app.schemas.site import SiteCreate, SiteUpdate, SiteResponse
 
@@ -23,7 +23,7 @@ async def list_sites(
 async def create_site(
     body: SiteCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: str = Depends(get_current_user),
+    _=Depends(require_admin),
 ):
     site = Site(**body.model_dump())
     db.add(site)
@@ -37,7 +37,7 @@ async def update_site(
     site_id: int,
     body: SiteUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: str = Depends(get_current_user),
+    _=Depends(require_admin),
 ):
     result = await db.execute(select(Site).where(Site.id == site_id))
     site = result.scalar_one_or_none()
@@ -56,7 +56,7 @@ async def update_site(
 async def delete_site(
     site_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: str = Depends(get_current_user),
+    _=Depends(require_admin),
 ):
     result = await db.execute(select(Site).where(Site.id == site_id))
     site = result.scalar_one_or_none()
