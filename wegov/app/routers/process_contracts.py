@@ -3,7 +3,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.deps import get_current_user, require_admin
+from app.core.deps import get_current_worker, require_admin
 from app.models.process_contract import ProcessContract
 from app.schemas.process_contract import ProcessContractCreate, ProcessContractResponse
 
@@ -15,7 +15,7 @@ async def list_process_contracts(
     site_name: str | None = Query(None, description="사업장명 필터"),
     process: str | None = Query(None, description="공정명 필터"),
     db: AsyncSession = Depends(get_db),
-    _=Depends(get_current_user),
+    _=Depends(get_current_worker),
 ):
     stmt = select(ProcessContract).order_by(ProcessContract.site_name, ProcessContract.process)
     if site_name:
@@ -32,7 +32,7 @@ async def lookup_contract(
     process: str = Query(...),
     line: str | None = Query(None),
     db: AsyncSession = Depends(get_db),
-    _=Depends(get_current_user),
+    _=Depends(get_current_worker),
 ):
     stmt = select(ProcessContract).where(
         ProcessContract.site_name == site_name,

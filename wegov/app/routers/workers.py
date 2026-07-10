@@ -4,7 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
-from app.core.deps import get_current_user, require_admin, require_leader_or_above
+from app.core.deps import require_admin, require_leader_or_above
 from app.core.security import hash_password
 from app.core.audit import save_audit_log
 from app.models.worker import Worker

@@ -29,7 +29,7 @@ async def create_correction(
 @router.get("/me", response_model=list[CorrectionResponse], summary="내 수정 요청 목록")
 async def get_my_corrections(
     db: AsyncSession = Depends(get_db),
-    current_user: str = Depends(get_current_user),
+    current_worker=Depends(get_current_worker),
 ):
     result = await db.execute(
         select(Correction)
