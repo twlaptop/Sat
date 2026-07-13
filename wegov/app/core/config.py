@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_access_token_expire_minutes: int = 120
     cors_origins: str = "*"  # 쉼표로 구분된 허용 URL (예: "https://admin.wegov.com,https://app.wegov.com")
+    default_password_worker: str = "1234"   # worker/leader 역할 초기 비밀번호
+    default_password_admin: str = "Admin1234!"  # admin 역할 초기 비밀번호
 
     model_config = SettingsConfigDict(
         env_file=_env_file(),

@@ -60,8 +60,10 @@ class Worker(Base):
     group_name: Mapped[str | None] = mapped_column(String(50), nullable=True)          # 그룹: 제조1그룹 / 제조2그룹 / 교대직장 등
     squad: Mapped[str | None] = mapped_column(String(20), nullable=True)               # 조: A조 / B조 / C조 / D조 / Day·Swing·OFFICE
     line: Mapped[str | None] = mapped_column(String(50), nullable=True)                # 라인: COW / BLADE / LAMI / FINISH / 4L Mold 등
-    birth_date: Mapped[str | None] = mapped_column(String(6), nullable=True)           # 생년월일 6자리 — 매번 로그인 시 비밀번호로 사용 (예: 950110)
-    resident_number_hash: Mapped[str | None] = mapped_column(String, nullable=True)    # 주민번호 bcrypt 해시 — 앱 최초 설치 시 본인 확인용 (1회만 사용)
+    birth_date: Mapped[str | None] = mapped_column(String(8), nullable=True)           # 생년월일 8자리 yyyymmdd — 아이디 구성요소 (이름+생년월일)
+    employee_number: Mapped[str | None] = mapped_column(String(50), nullable=True)    # 사번
+    password_hash: Mapped[str | None] = mapped_column(String, nullable=True)          # 개인 비밀번호 bcrypt 해시 — 없으면 역할별 초기 비밀번호 사용
+    resident_number_hash: Mapped[str | None] = mapped_column(String, nullable=True)   # 주민번호 bcrypt 해시 — 앱 최초 설치 시 본인 확인용 (1회만 사용)
     expected_hire_date: Mapped[date | None] = mapped_column(Date, nullable=True)       # 입사예정일
     blood_type: Mapped[str | None] = mapped_column(String(5), nullable=True)           # 혈액형
     gender: Mapped[str | None] = mapped_column(String(10), nullable=True)              # 성별

@@ -17,7 +17,8 @@ class WorkerCreate(BaseModel):
     group_name: str | None = Field(None, description="그룹")
     squad: str | None = Field(None, description="조")
     line: str | None = Field(None, description="라인")
-    birth_date: str | None = Field(None, min_length=6, max_length=6, description="생년월일 6자리")
+    birth_date: str | None = Field(None, min_length=8, max_length=8, description="생년월일 8자리 (yyyymmdd)")
+    employee_number: str | None = Field(None, description="사번")
     resident_number_hash: str | None = Field(None, description="주민번호 bcrypt 해시")
     expected_hire_date: date | None = Field(None, description="입사예정일")
     blood_type: str | None = Field(None, description="혈액형")
@@ -42,6 +43,7 @@ class WorkerUpdate(BaseModel):
     squad: str | None = None
     line: str | None = None
     birth_date: str | None = None
+    employee_number: str | None = None
     expected_hire_date: date | None = None
     blood_type: str | None = None
     gender: str | None = None
@@ -67,6 +69,8 @@ class WorkerResponse(BaseModel):
     group_name: str | None
     squad: str | None
     line: str | None
+    birth_date: str | None
+    employee_number: str | None
     expected_hire_date: date | None
     blood_type: str | None
     gender: str | None
@@ -83,3 +87,8 @@ class WorkerResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class WorkerBulkUploadResponse(BaseModel):
+    created: int
+    errors: list[dict]
