@@ -28,16 +28,25 @@ def _verify_login_password(input_password: str, worker: Worker) -> bool:
 
 @router.post("/login", response_model=TokenResponse, summary="로그인")
 async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
+    # birth_date 6자리 입력 시 앞에 '19' 또는 '20' 붙여 8자리로 정규화
+    birth_date = body.birth_date
+    if len(birth_date) == 6:
+        prefix = "20" if int(birth_date[:2]) <= 25 else "19"
+        birth_date = prefix + birth_date
+
     result = await db.execute(
         select(Worker).where(
             Worker.name == body.name,
-            Worker.birth_date == body.birth_date,
+            Worker.birth_date == birth_date,
             Worker.active_filter(),
         )
     )
     worker = result.scalars().first()
 
-    if worker is None or not _verify_login_password(body.password, worker):
+    # 비밀번호 생략 시 birth_date(정규화 전 원본)를 비밀번호로 사용
+    password = body.password if body.password is not None else body.birth_date
+
+    if worker is None or not _verify_login_password(password, worker):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="이름, 생년월일 또는 비밀번호가 올바르지 않습니다.",

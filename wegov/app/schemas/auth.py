@@ -1,11 +1,13 @@
+from __future__ import annotations
+from typing import Optional
 from pydantic import BaseModel, Field
 
 
-# 로그인 요청 — 이름 + 생년월일 8자리 + 비밀번호
+# 로그인 요청 — 이름 + 생년월일 6~8자리 + 비밀번호(생략 시 생년월일로 대체)
 class LoginRequest(BaseModel):
     name: str = Field(..., description="직원 이름")
-    birth_date: str = Field(..., min_length=8, max_length=8, description="생년월일 8자리 (예: 19950110)")
-    password: str = Field(..., description="비밀번호 (worker/leader: 숫자 4자리, admin: 8자 이상)")
+    birth_date: str = Field(..., min_length=6, max_length=8, description="생년월일 6~8자리 (예: 950110 또는 19950110)")
+    password: Optional[str] = Field(None, description="비밀번호 — 생략 시 birth_date 값으로 인증")
 
 
 # 계정 최초 활성화 요청 — 이름 + 주민번호 평문
