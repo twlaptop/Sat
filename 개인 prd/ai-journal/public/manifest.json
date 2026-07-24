@@ -1,0 +1,13 @@
+{
+  "name": "AI 감정 저널",
+  "short_name": "저널",
+  "description": "AI가 감정을 분류하고 회고 질문을 던져주는 저널",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#6366f1",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
